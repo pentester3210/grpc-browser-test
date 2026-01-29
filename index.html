@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>gRPC-Web File Transfer</title>
+  <style>
+    body { font-family: Arial, sans-serif; max-width: 800px; margin: 0 auto; padding: 20px; }
+    h1 { color: #333; }
+    button { padding: 10px 20px; margin: 10px 0; background: #0066cc; color: white; border: none; cursor: pointer; }
+    button:hover { background: #0055aa; }
+    input[type="file"], input[type="text"] { margin: 10px 0; padding: 8px; width: 100%; max-width: 400px; }
+    #status { margin-top: 20px; color: #555; font-style: italic; }
+  </style>
+  <script src="bundle.js" defer></script>
+</head>
+<body>
+  <h1>Upload File (via gRPC-Web)</h1>
+  <input type="file" id="uploadFile">
+  <button onclick="uploadFile()">Start Upload</button>
+
+  <h1>Download File (via gRPC-Web)</h1>
+  <input type="text" id="downloadFilename" placeholder="Enter exact filename on server">
+  <button onclick="downloadFile()">Start Download</button>
+
+  <div id="status"></div>
+
+  <p style="margin-top: 40px; font-size: 0.9em; color: #777;">
+    Note: The proxy URL is set in the bundled JavaScript.<br>
+    If upload/download fails, check browser console (F12) for errors.
+  </p>
+</body>
+</html>

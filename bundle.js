@@ -1,9 +1,9 @@
 (function(){function r(e,n,t){function o(i,f){if(!n[i]){if(!e[i]){var c="function"==typeof require&&require;if(!f&&c)return c(i,!0);if(u)return u(i,!0);var a=new Error("Cannot find module '"+i+"'");throw a.code="MODULE_NOT_FOUND",a}var p=n[i]={exports:{}};e[i][0].call(p.exports,function(r){var n=e[i][1][r];return o(n||r)},p,p.exports,r,e,n,t)}return n[i].exports}for(var u="function"==typeof require&&require,i=0;i<t.length;i++)o(t[i]);return o}return r})()({1:[function(require,module,exports){
 "use strict";
 
-// client-bundle.js – bundled with Browserify to bundle.js
+// client-bundle.js ────────────────────────────────────────────────
+// This file is bundled locally with Browserify → creates bundle.js
 
-var jspb = require('google-protobuf'); // explicitly include for safety
 var _require = require('./file_pb'),
   UploadRequest = _require.UploadRequest,
   DownloadRequest = _require.DownloadRequest,
@@ -12,35 +12,57 @@ var _require = require('./file_pb'),
 var _require2 = require('./file_grpc_web_pb'),
   FileServiceClient = _require2.FileServiceClient;
 
-// Expose to global scope for index.html
+// Make constructors available globally so index.html can use them
+window.UploadRequest = UploadRequest;
+window.DownloadRequest = DownloadRequest;
+
+// Global client instance (re-created on each action)
+var client = null;
+
+// Status helper
+function setStatus(msg) {
+  var isError = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : false;
+  var el = document.getElementById('status');
+  if (el) {
+    el.textContent = msg;
+    el.style.color = isError ? 'red' : '#006600';
+  }
+  console.log(msg);
+}
+
+// ──────────────────────────────────────────────────────────────
+// Upload function
 window.uploadFile = function () {
   var fileInput = document.getElementById('uploadFile');
   var file = fileInput.files[0];
   if (!file) {
-    setStatus("Please select a file", true);
+    setStatus("Please select a file first", true);
     return;
   }
   setStatus("Starting upload...");
 
-  // ← CHANGE THIS EVERY TIME NGROK RESTARTS
-  var proxyUrl = 'https://mischievous-thalia-periodically.ngrok-free.dev'; // your current ngrok HTTPS URL
+  // Update this URL every time ngrok restarts / changes
+  var proxyUrl = 'https://mischievous-thalia-periodically.ngrok-free.dev'; // ← REPLACE WITH YOUR CURRENT NGROK HTTPS URL
 
-  var client = new FileServiceClient(proxyUrl);
-  var call = client.upload({}, function (err, response) {
+  client = new FileServiceClient(proxyUrl, null, null);
+
+  // IMPORTANT: method name is Upload (capital U), not upload
+  var call = client.Upload({}, function (err, response) {
     if (err) {
-      setStatus("Upload failed: ".concat(err.message || err), true);
-      console.error(err);
+      setStatus("Upload failed: " + (err.message || err), true);
+      console.error('Upload error:', err);
       return;
     }
-    setStatus("Success! Uploaded ".concat(response.getSize(), " bytes (ID: ").concat(response.getFileId(), ")"));
+    setStatus("Upload complete! Size: ".concat(response.getSize(), " bytes, ID: ").concat(response.getFileId() || 'N/A'));
   });
   var reader = file.stream().getReader();
   var offset = 0;
-  function process(_ref) {
+  function processChunk(_ref) {
     var done = _ref.done,
       value = _ref.value;
     if (done) {
       call.end();
+      setStatus("Upload stream finished");
       return;
     }
     var req = new UploadRequest();
@@ -49,67 +71,68 @@ window.uploadFile = function () {
     req.setOffset(offset);
     call.write(req);
     offset += value.length;
-    setStatus("Uploading... ".concat((offset / file.size * 100).toFixed(1), "%"));
-    reader.read().then(process);
+    setStatus("Uploading... ".concat(Math.round(offset / file.size * 100), "%"));
+    reader.read().then(processChunk);
   }
-  reader.read().then(process);
+  reader.read().then(processChunk);
 };
+
+// ──────────────────────────────────────────────────────────────
+// Download function
 window.downloadFile = function () {
   var filename = document.getElementById('downloadFilename').value.trim();
   if (!filename) {
-    setStatus("Enter a filename", true);
+    setStatus("Please enter a filename", true);
     return;
   }
   setStatus("Starting download...");
 
-  // Same proxy URL
-  var proxyUrl = 'https://mischievous-thalia-periodically.ngrok-free.dev'; // ← CHANGE THIS
+  // Same proxy URL as upload
+  var proxyUrl = 'https://mischievous-thalia-periodically.ngrok-free.dev'; // ← REPLACE WITH YOUR CURRENT NGROK HTTPS URL
 
-  var client = new FileServiceClient(proxyUrl);
+  client = new FileServiceClient(proxyUrl, null, null);
   var req = new DownloadRequest();
   req.setFilename(filename);
-  req.setOffset(0); // increase for resume
+  req.setOffset(0); // can be changed for resume
 
-  var call = client.download(req);
+  // IMPORTANT: method name is Download (capital D)
+  var call = client.Download(req);
   var chunks = [];
-  var total = 0;
-  call.on('data', function (msg) {
-    var chunk = msg.getChunk();
+  var received = 0;
+  call.on('data', function (response) {
+    var chunk = response.getChunk_asU8(); // better to use typed array
     chunks.push(chunk);
-    total += chunk.length;
-    setStatus("Downloading... ".concat(total, " bytes"));
+    received += chunk.length;
+    setStatus("Downloading... ".concat(received, " bytes received"));
   });
   call.on('end', function () {
     if (chunks.length === 0) {
-      setStatus("File not found or empty", true);
+      setStatus("No data received – file may not exist or empty", true);
       return;
     }
     var blob = new Blob(chunks);
     var url = URL.createObjectURL(blob);
-    var link = document.createElement('a');
-    link.href = url;
-    link.download = filename;
-    link.click();
+    var a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
     URL.revokeObjectURL(url);
-    setStatus("Download finished (".concat(total, " bytes)"));
+    setStatus("Download complete (".concat(received, " bytes)"));
+  });
+  call.on('status', function (status) {
+    if (status.code !== 0) {
+      setStatus("Stream status error: " + status.details, true);
+    }
   });
   call.on('error', function (err) {
-    setStatus("Download error: ".concat(err.message || err), true);
-    console.error(err);
+    setStatus("Download failed: " + (err.message || err), true);
+    console.error('Download error:', err);
   });
 };
 
-// Status helper (called from index.html)
-function setStatus(text) {
-  var error = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : false;
-  var statusEl = document.getElementById('status');
-  if (statusEl) {
-    statusEl.textContent = text;
-    statusEl.style.color = error ? 'red' : 'green';
-  }
-}
-
-},{"./file_grpc_web_pb":2,"./file_pb":3,"google-protobuf":4}],2:[function(require,module,exports){
+},{"./file_grpc_web_pb":2,"./file_pb":3}],2:[function(require,module,exports){
 "use strict";
 
 /**

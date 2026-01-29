@@ -1,7 +1,7 @@
 (function(){function r(e,n,t){function o(i,f){if(!n[i]){if(!e[i]){var c="function"==typeof require&&require;if(!f&&c)return c(i,!0);if(u)return u(i,!0);var a=new Error("Cannot find module '"+i+"'");throw a.code="MODULE_NOT_FOUND",a}var p=n[i]={exports:{}};e[i][0].call(p.exports,function(r){var n=e[i][1][r];return o(n||r)},p,p.exports,r,e,n,t)}return n[i].exports}for(var u="function"==typeof require&&require,i=0;i<t.length;i++)o(t[i]);return o}return r})()({1:[function(require,module,exports){
 "use strict";
 
-// TEST TEST
+//TESTTEST
 
 // client-bundle.js ────────────────────────────────────────────────
 // This file is bundled locally with Browserify → creates bundle.js
@@ -48,8 +48,8 @@ window.uploadFile = function () {
 
   client = new FileServiceClient(proxyUrl, null, null);
 
-  // IMPORTANT: method name is Upload (capital U), not upload
-  var call = client.Upload({}, function (err, response) {
+  // IMPORTANT: method name is camelCase 'upload' (not 'Upload')
+  var call = client.upload({}, function (err, response) {
     if (err) {
       setStatus("Upload failed: " + (err.message || err), true);
       console.error('Upload error:', err);
@@ -97,8 +97,8 @@ window.downloadFile = function () {
   req.setFilename(filename);
   req.setOffset(0); // can be changed for resume
 
-  // IMPORTANT: method name is Download (capital D)
-  var call = client.Download(req);
+  // IMPORTANT: method name is camelCase 'download' (not 'Download')
+  var call = client.download(req);
   var chunks = [];
   var received = 0;
   call.on('data', function (response) {
